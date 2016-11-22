@@ -9,15 +9,15 @@ Version: 1.0
 Author: Fabrizio Costa [costa@informatik.uni-freiburg.de]
 
 Usage:
-  RaSE -i <sequence>
-              [-k N] [-c N] [-n N] [-w N] [-b N] [-p N] [-r N] [-e N]
-              [-l] [-t] [--draw]
-              [--verbose]
+  RaSE [-i <sequence>]
+      [-k N] [-c N] [-n N] [-w N] [-b N] [-p N] [-r N] [-e N]
+      [-l] [-t] [--draw]
+      [--verbose]
   RaSE (-h | --help)
   RaSE --version
 
 Options:
-  -i <sequence>                     Specify input sequence.
+  -i <sequence>                     Specify input sequence [default: stdin].
   -k N                              Specify number of maximally unstable
                                     nucleotides to mark [default: 5].
   -c N                              Complexity of features [default: 3].
@@ -37,6 +37,7 @@ Options:
 
 
 """
+import sys
 from docopt import docopt
 from toolz import curry, compose
 from toolz.sandbox.core import unzip
@@ -91,6 +92,7 @@ def make_variations(seq, index=0, alphabet='ACGU'):
 
 
 def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
+    # TODO: parallelize indices
     for index in range(len(seq)):
         cmake_variations = curry(make_variations)(index=index,
                                                   alphabet=alphabet)
@@ -180,12 +182,14 @@ def draw(seq,
 def main(args):
     """Main."""
     # setup variables
-    seq = args['-i']
+    seq = (sys.stdin.readline().strip() if args['-i'] == 'stdin' else args['-i'])
     k = int(args['-k'])
     complexity = int(args['-c'])
     nbits = int(args['-n'])
     window_size = int(args['-w'])
+    window_size = min(len(seq), window_size)
     max_bp_span = int(args['-b'])
+    max_bp_span = min(len(seq), max_bp_span)
     avg_bp_prob_cutoff = float(args['-p'])
     hard_threshold = float(args['-r'])
     max_num_edges = int(args['-e'])
