@@ -1,5 +1,5 @@
 # RaSE
-RaSE - RNA structurAl Stability Estimate
+RaSE - RNA structurAl Stability Estimator
 
 
 
@@ -7,7 +7,7 @@ RaSE - RNA structurAl Stability Estimate
 ## Help
 
 ```
-RaSE - RNA structurAl Stability Estimate.
+RaSE - RNA structurAl Stability Estimator.
 
 Compute stability.
 
