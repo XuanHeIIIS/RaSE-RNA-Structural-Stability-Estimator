@@ -2,7 +2,11 @@
 RaSE - RNA structurAl Stability Estimator
 
 
+## Example
 
+```
+echo 'AACAGUCGAUCGAUCGAC' | ./code/RaSE.py --draw | tee out.txt && open out.pdf
+```
 
 ## Help
 
