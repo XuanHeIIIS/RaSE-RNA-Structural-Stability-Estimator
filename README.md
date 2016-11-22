@@ -1,2 +1,2 @@
-# RiSE
-RiSE - Rna stabIlity Structure Estimator
+# RaSE
+RaSE - RNA structurAl Stability Estimate
