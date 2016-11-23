@@ -48,7 +48,9 @@ from eden.converter.rna.rnaplfold import rnaplfold_to_eden
 from eden.converter.rna.rnafold import RNAfold_wrapper
 from eden.graph import Vectorizer
 from eden.util.display import draw_graph
+import matplotlib.pyplot as plt
 from eden.util import configure_logging, serialize_dict
+import numpy as np
 
 import logging
 logger = logging.getLogger(__name__)
@@ -199,60 +201,137 @@ def serialize(seq, snips, scores, k=5):
         yield '%3d %s %s %.2f %s %s' % (i, nt, snip, score, struct, mark)
 
 
-def rna_structural_stability_estimate(seq,
-                                      alphabet='ACGU',
-                                      k=5,
-                                      complexity=3,
-                                      nbits=15,
-                                      fold=None):
-    """Wrapper for the computation of the structural effects of nt change.
+class StructuralStabilityEstimator(object):
+    """Class for the computation of the structural effects of nt change."""
 
-    This function pretty prints the computed results.
-    """
-    fold_vectorize = make_fold_vectorize(complexity=complexity,
-                                         nbits=nbits,
-                                         fold=fold)
-    snips, scores = stability(seq, alphabet='ACGU',
-                              fold_vectorize=fold_vectorize)
-    return serialize(seq, snips, scores, k=k)
+    def __init__(self,
+                 alphabet='ACGU',
+                 k=5,
+                 complexity=3,
+                 nbits=15,
+                 window_size=150,
+                 max_bp_span=130,
+                 avg_bp_prob_cutoff=0.1,
+                 hard_threshold=0.5,
+                 max_num_edges=2,
+                 no_lonely_bps=True,
+                 nesting=True):
+        """Curry parameters in the folding algorithm.
 
+         Parameters
+        ----------
+        max_num_edges : int (default 2)
+            Is the maximal number of base pair bonds allowed per nucleotide.
 
-def _update_graph(graph, scores, snips):
-    for u in graph.nodes():
-        pos = graph.node[u]['position']
-        graph.node[u]['stability'] = scores[pos]
-        graph.node[u]['snip'] = snips[pos]
-    return graph
+        window_size : int (default 150)
+            Is the size of the window.
 
+        max_bp_span : int (default 130)
+            Is the maximum number of bases between to bases that pair.
 
-def _draw(seq, file_name=None, snips=None, scores=None, fold=None):
-    seqs = [('', seq)]
-    graphs = fold(seqs)
-    graph = graphs.next()
-    graph = _update_graph(graph, scores, snips)
+        avg_bp_prob_cutoff : float (default 0.1)
+            Is the threshold value under which the edge is not materialized.
 
-    opts = {'size': 14, 'vertex_border': False, 'vertex_size': 400,
-            'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
-            'invert_colormap': True, 'secondary_vertex_label': 'snip',
-            'vertex_color': 'stability', 'colormap': 'Blues',
-            'ignore_for_layout': 'nesting', 'layout': 'KK'}
-    draw_graph(graph, file_name=file_name, **opts)
+        no_lonely_bps : bool (default True)
+            If True no lonely base pairs are allowed.
 
+        nesting : bool (default True)
+            If True the edge type is 'nesting'.
 
-def draw(seq,
-         file_name=None,
-         fold=None,
-         complexity=3,
-         nbits=15):
-    """Graphical representation of the RNA folded structure.
+        hard_threshold : float (default 0.5)
+            If the edges with avg probability is greater than hard_threshold
+            then they are not of nesting type.
+        """
+        self.k = k
+        self.snips = None
+        self.scores = None
+        self.seq = None
+        self.fold = make_fold(window_size=window_size,
+                              max_bp_span=max_bp_span,
+                              avg_bp_prob_cutoff=avg_bp_prob_cutoff,
+                              hard_threshold=hard_threshold,
+                              max_num_edges=max_num_edges,
+                              no_lonely_bps=no_lonely_bps,
+                              nesting=nesting)
+        self.fold_vectorize = make_fold_vectorize(complexity=complexity,
+                                                  nbits=nbits,
+                                                  fold=self.fold)
 
-    Nodes encode the original nt and the most de-stabilizing alternative.
-    """
-    fold_vectorize = make_fold_vectorize(complexity=complexity,
-                                         nbits=nbits,
-                                         fold=fold)
-    snips, scores = stability(seq, fold_vectorize=fold_vectorize)
-    _draw(seq, file_name=file_name, snips=snips, scores=scores, fold=fold)
+    def transform(self, seq):
+        """Wrapper for the computation of the structural effects of nt change.
+
+        This function pretty prints the computed results.
+        """
+        self.seq = seq
+        snips, scores = stability(seq,
+                                  alphabet='ACGU',
+                                  fold_vectorize=self.fold_vectorize)
+        self.snips = snips
+        self.scores = scores
+        return serialize(seq, snips, scores, k=self.k)
+
+    def _update_graph(self, graph, scores, snips):
+        for u in graph.nodes():
+            pos = graph.node[u]['position']
+            graph.node[u]['stability'] = scores[pos]
+            graph.node[u]['snip'] = snips[pos]
+        return graph
+
+    def _draw(self, seq, file_name=None, snips=None, scores=None, fold=None):
+        seqs = [('', seq)]
+        graphs = fold(seqs)
+        graph = graphs.next()
+        graph = self._update_graph(graph, scores, snips)
+
+        opts = {'size': 14, 'vertex_border': False, 'vertex_size': 400,
+                'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
+                'invert_colormap': True, 'secondary_vertex_label': 'snip',
+                'vertex_color': 'stability', 'colormap': 'Blues',
+                'ignore_for_layout': 'nesting', 'layout': 'KK'}
+        draw_graph(graph, file_name=file_name, **opts)
+
+    def draw(self, file_name=None):
+        """Graphical representation of the RNA folded structure.
+
+        Nodes encode the original nt and the most de-stabilizing alternative.
+        """
+        self._draw(self.seq,
+                   file_name=file_name,
+                   snips=self.snips,
+                   scores=self.scores,
+                   fold=self.fold)
+
+    def plot(self, file_name=None):
+        """Graph of unstability in the RNA sequence."""
+        size = len(self.scores) / 2.5
+        fig = plt.figure(figsize=(size, 2.5))
+        ax1 = fig.add_subplot(111)
+        width = 1
+        x = np.array(range(len(self.scores))) - width / 2.0
+        y = 1 - np.array(self.scores)
+        ax1.bar(x, y, width, alpha=0.3)
+        ax1.set_xticks(range(len(self.seq)))
+        ax1.set_xticklabels(list(self.seq))
+        ax1.set_xlim(-1, len(self.seq))
+        ax2 = ax1.twiny()
+        ax2.set_xlim(-1, len(self.seq))
+        ax2.set_xticks(range(len(self.seq)))
+        ax3 = ax1.twiny()
+        ax3.yaxis.set_visible(False)
+        ax3.set_xlim(-1, len(self.seq))
+        ax3.set_xticks(range(len(self.seq)))
+        ax3.set_xticklabels(list(self.snips))
+        pos = ax3.get_position()
+        pos = [pos.x0, pos.y0, pos.width, 0.001]
+        ax3.set_position(pos)
+        if file_name is None:
+            plt.show()
+        else:
+            plt.savefig(file_name,
+                        bbox_inches='tight',
+                        transparent=True,
+                        pad_inches=0)
+            plt.close()
 
 
 def main(args):
@@ -288,30 +367,25 @@ def main(args):
     logger.debug(serialize_dict(args))
 
     # setup folding algorithm
-    fold = make_fold(window_size=window_size,
-                     max_bp_span=max_bp_span,
-                     avg_bp_prob_cutoff=avg_bp_prob_cutoff,
-                     hard_threshold=hard_threshold,
-                     max_num_edges=max_num_edges,
-                     no_lonely_bps=no_lonely_bps,
-                     nesting=nesting)
-    # setup vectorizer
-    fold_vectorize = make_fold_vectorize(complexity=complexity,
-                                         nbits=nbits,
-                                         fold=fold)
-    # compute the most de-stabilizing single nt change per position
-    # and the corresponding similarity of the resulting structure
-    # w.r.t. the original
-    snips, scores = stability(seq,
-                              alphabet='ACGU',
-                              fold_vectorize=fold_vectorize)
+    rase = StructuralStabilityEstimator(alphabet='ACGU',
+                                        k=k,
+                                        complexity=complexity,
+                                        nbits=nbits,
+                                        window_size=window_size,
+                                        max_bp_span=max_bp_span,
+                                        avg_bp_prob_cutoff=avg_bp_prob_cutoff,
+                                        hard_threshold=hard_threshold,
+                                        max_num_edges=max_num_edges,
+                                        no_lonely_bps=no_lonely_bps,
+                                        nesting=nesting)
     # print: nt pos, original nt, most de-stabilizing nt, similarity score
-    for line in serialize(seq, snips, scores, k=k):
+    for line in rase.transform(seq):
         print(line)
 
     # if drawing is required use the folding algorithm to compute the graph
     if args['--draw']:
-        _draw(seq, file_name='out.pdf', snips=snips, scores=scores, fold=fold)
+        rase.draw(file_name='structure.pdf')
+        rase.plot(file_name='score.pdf')
 
 
 if __name__ == '__main__':
