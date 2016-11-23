@@ -11,9 +11,9 @@ Author: Fabrizio Costa [costa@informatik.uni-freiburg.de]
 Usage:
   RaSE [-i <sequence>]
        [-k N] [-c N, --complexity=N] [-n N, --nbits=N] [-w N, --window_size=N]
-       [-b N, --max_bp_span=N] [-p N]
-       [-r N] [-e N]
-       [-l] [-t] [--draw]
+       [-b N, --max_bp_span=N] [-p N, --avg_bp_prob_cutoff=N]
+       [-r N, --hard_threshold=N] [-e N, --max_num_edges=N]
+       [-l, --no_lonely_bps] [-t, --no_nesting] [--draw]
        [--verbose]
   RaSE (-h | --help)
   RaSE --version
@@ -27,11 +27,11 @@ Options:
                                     pseudo identifiers [default: 15].
   -w N, --window_size=N             Window size [default: 150]
   -b N, --max_bp_span=N             Max number of spanning bases [default: 130]
-  -p N                              Average probability cutoff [default: 0.1]
-  -r N                              Hard threshold [default: 0.5]
-  -e N                              Max num edges [default: 2]
-  -l                                Flag to activate no lonely base pairs mode.
-  -t                                Flag to activate no nesting mode.
+  -p N, --avg_bp_prob_cutoff=N      Average probability cutoff [default: 0.1]
+  -r N, --hard_threshold=N          Hard threshold [default: 0.5]
+  -e N, --max_num_edges=N           Max num edges [default: 2]
+  -l, --no_lonely_bps               Flag to activate no lonely base pairs mode.
+  -t, --no_nesting                  Flag to activate no nesting mode.
   --draw                            Output drawing with standard name out.pdf.
   -h --help                         Show this screen.
   --version                         Show version.
@@ -244,11 +244,11 @@ def main(args):
     window_size = min(len(seq), window_size)
     max_bp_span = int(args['--max_bp_span'][0])
     max_bp_span = min(len(seq), max_bp_span)
-    avg_bp_prob_cutoff = float(args['-p'])
-    hard_threshold = float(args['-r'])
-    max_num_edges = int(args['-e'])
-    no_lonely_bps = args['-l']
-    no_nesting = args['-t']
+    avg_bp_prob_cutoff = float(args['--avg_bp_prob_cutoff'][0])
+    hard_threshold = float(args['--hard_threshold'][0])
+    max_num_edges = int(args['--max_num_edges'][0])
+    no_lonely_bps = args['--no_lonely_bps']
+    no_nesting = args['--no_nesting']
     if no_nesting is True:
         nesting = False
     else:
