@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/74471783.svg)](https://zenodo.org/badge/latestdoi/74471783)
+
 # RaSE
 RaSE - RNA structurAl Stability Estimator
 
