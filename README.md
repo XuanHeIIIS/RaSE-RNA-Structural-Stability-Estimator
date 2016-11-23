@@ -101,10 +101,10 @@ Usage:
        [-k N] [-c N, --complexity=N] [-n N, --nbits=N] [-w N, --window_size=N]
        [-b N, --max_bp_span=N] [-p N, --avg_bp_prob_cutoff=N]
        [-r N, --hard_threshold=N] [-e N, --max_num_edges=N]
-       [-l, --no_lonely_bps] [-t, --no_nesting] [--draw]
+       [-l, --no_lonely_bps] [-t, --no_nesting]
+       [--draw] [--jpg | --svg | --png | --pdf]
        [--verbose]
-  RaSE (-h | --help)
-  RaSE --version
+  RaSE (-h | --help | --version)
 
 Options:
   -i <sequence>                     Specify input sequence [default: stdin].
@@ -121,7 +121,12 @@ Options:
   -l, --no_lonely_bps               Flag to activate no lonely base pairs mode.
   -t, --no_nesting                  Flag to activate no nesting mode.
   --draw                            Output drawing with standard name out.pdf.
+  --jpg                             Save images in jpg format.
+  --svg                             Save images in svg format.
+  --png                             Save images in png format.
+  --pdf                             Save images in pdf format.
   -h --help                         Show this screen.
   --version                         Show version.
   --verbose                         Print more text.
+
 ```
