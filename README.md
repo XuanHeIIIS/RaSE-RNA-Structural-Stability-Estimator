@@ -3,7 +3,7 @@ RaSE - RNA structurAl Stability Estimator
 
 <p align="center"><img src="img/trna.png"></p>
 
-## Example
+## Usage
 
 ```
 echo 'AACAGUCGAUCGAUCGAC' | ./code/RaSE.py --draw | tee out.txt && open out.pdf
