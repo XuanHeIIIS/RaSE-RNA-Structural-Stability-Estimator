@@ -15,8 +15,7 @@ Usage:
        [-r N, --hard_threshold=N] [-e N, --max_num_edges=N]
        [-l, --no_lonely_bps] [-t, --no_nesting] [--draw]
        [--verbose]
-  RaSE (-h | --help)
-  RaSE --version
+  RaSE (-h | --help | --version)
 
 Options:
   -i <sequence>                     Specify input sequence [default: stdin].
@@ -33,6 +32,7 @@ Options:
   -l, --no_lonely_bps               Flag to activate no lonely base pairs mode.
   -t, --no_nesting                  Flag to activate no nesting mode.
   --draw                            Output drawing with standard name out.pdf.
+  --format
   -h --help                         Show this screen.
   --version                         Show version.
   --verbose                         Print more text.
@@ -45,12 +45,32 @@ from toolz import curry, compose
 from toolz.sandbox.core import unzip
 from sklearn.metrics.pairwise import pairwise_kernels
 from eden.converter.rna.rnaplfold import rnaplfold_to_eden
+from eden.converter.rna.rnafold import RNAfold_wrapper
 from eden.graph import Vectorizer
 from eden.util.display import draw_graph
 from eden.util import configure_logging, serialize_dict
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def dotbracket(seq):
+    """Compute the MFE in dotbracket notation."""
+    seq_info, seq_struct = RNAfold_wrapper(seq)
+    return seq_struct
+
+
+def _replace(seq, position, character):
+    tokens = list(seq)
+    tokens[position] = character
+    return ''.join(tokens)
+
+
+def compute_mfes(seq, snips):
+    """Given a sequence and the snip sequence yield all mfes."""
+    for position, character in enumerate(snips):
+        alt_seq = _replace(seq, position, character)
+        yield dotbracket(alt_seq)
 
 
 def make_fold(window_size=150,
@@ -167,12 +187,16 @@ def serialize(seq, snips, scores, k=5):
         [(score, i, nt, snip)
          for i, (snip, score, nt) in enumerate(zip(snips, scores, seq))])
     score_th = tuples[k][0]
-    for i, (snip, score, nt) in enumerate(zip(snips, scores, seq)):
+    mfes = compute_mfes(seq, snips)
+    tuples = zip(snips, scores, seq, mfes)
+    header = '             %s' % dotbracket(seq)
+    yield header
+    for i, (snip, score, nt, struct) in enumerate(tuples):
         if score <= score_th:
             mark = '*'
         else:
             mark = ''
-        yield '%3d %s %s %.2f %s' % (i, nt, snip, score, mark)
+        yield '%3d %s %s %.2f %s %s' % (i, nt, snip, score, struct, mark)
 
 
 def rna_structural_stability_estimate(seq,
