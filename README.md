@@ -1,6 +1,7 @@
 # RaSE
 RaSE - RNA structurAl Stability Estimator
 
+<p align="center"><img src="img/trna.png"></p>
 
 ## Example
 
