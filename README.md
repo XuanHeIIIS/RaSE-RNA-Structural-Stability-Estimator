@@ -7,6 +7,24 @@ RaSE - RNA structurAl Stability Estimator
 
 ```
 echo 'AACAGUCGAUCGAUCGAC' | ./code/RaSE.py --draw | tee out.txt && open out.pdf
+  0 A C 0.90
+  1 A G 0.86
+  2 C A 0.79
+  3 A G 0.14 *
+  4 G U 0.57
+  5 U A 0.44
+  6 C A 0.23 *
+  7 G U 0.20 *
+  8 A U 0.51
+  9 U G 0.69
+ 10 C A 0.76
+ 11 G A 0.76
+ 12 A G 0.69
+ 13 U A 0.51
+ 14 C U 0.21 *
+ 15 G U 0.27 *
+ 16 A U 0.16 *
+ 17 C A 0.57
 ```
 
 ## Help
