@@ -11,7 +11,7 @@ Author: Fabrizio Costa [costa@informatik.uni-freiburg.de]
 Usage:
   RaSE [-i <sequence>]
        [-k N] [-c N, --complexity=N] [-n N, --nbits=N] [-w N, --window_size=N]
-       [-b N] [-p N]
+       [-b N, --max_bp_span=N] [-p N]
        [-r N] [-e N]
        [-l] [-t] [--draw]
        [--verbose]
@@ -26,7 +26,7 @@ Options:
   -n N, --nbits=N                   Num bits to represent all possible feature
                                     pseudo identifiers [default: 15].
   -w N, --window_size=N             Window size [default: 150]
-  -b N                              Max number of spanning bases [default: 130]
+  -b N, --max_bp_span=N             Max number of spanning bases [default: 130]
   -p N                              Average probability cutoff [default: 0.1]
   -r N                              Hard threshold [default: 0.5]
   -e N                              Max num edges [default: 2]
@@ -99,6 +99,7 @@ def make_fold(window_size=150,
 def make_fold_vectorize(complexity=3,
                         nbits=15,
                         fold=None):
+    """Curry parameters in vectorizer."""
     vec = Vectorizer(complexity=complexity, nbits=nbits)
     vectorize = curry(lambda vec, graphs: vec.transform(graphs))(vec)
 
@@ -120,6 +121,11 @@ def _make_variations(seq, index=0, alphabet='ACGU'):
 
 
 def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
+    """Compute the structural effects of single nt change.
+
+    Specifically, compute the least similarity of the structure obtained
+    by replacing each nucleotide with all possible alternatives.
+    """
     # TODO: parallelize indices
     for index in range(len(seq)):
         _cmake_variations = curry(_make_variations)(index=index,
@@ -140,6 +146,12 @@ def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
 
 
 def stability(seq, alphabet='ACGU', fold_vectorize=None):
+    """Compute the structural effects of single nt change.
+
+    Specifically, compute the least similarity of the structure obtained
+    by replacing each nucleotide with all possible alternatives.
+    This function wraps compute_stability and post processes its output.
+    """
     scores, snips = unzip(
         compute_stability(seq,
                           alphabet=alphabet,
@@ -150,6 +162,7 @@ def stability(seq, alphabet='ACGU', fold_vectorize=None):
 
 
 def serialize(seq, snips, scores, k=5):
+    """Pretty print of the snip information and the realtive scores."""
     tuples = sorted(
         [(score, i, nt, snip)
          for i, (snip, score, nt) in enumerate(zip(snips, scores, seq))])
@@ -168,6 +181,10 @@ def rna_structural_stability_estimate(seq,
                                       complexity=3,
                                       nbits=15,
                                       fold=None):
+    """Wrapper for the computation of the structural effects of nt change.
+
+    This function pretty prints the computed results.
+    """
     fold_vectorize = make_fold_vectorize(complexity=complexity,
                                          nbits=nbits,
                                          fold=fold)
@@ -203,6 +220,10 @@ def draw(seq,
          fold=None,
          complexity=3,
          nbits=15):
+    """Graphical representation of the RNA folded structure.
+
+    Nodes encode the original nt and the most de-stabilizing alternative.
+    """
     fold_vectorize = make_fold_vectorize(complexity=complexity,
                                          nbits=nbits,
                                          fold=fold)
@@ -214,13 +235,14 @@ def main(args):
     """Main."""
     # read variables
     # if no -i is given then read from stdin
-    seq = (sys.stdin.readline().strip() if args['-i'] == 'stdin' else args['-i'])
+    seq = args['-i']
+    seq = (sys.stdin.readline().strip() if args['-i'] == 'stdin' else seq)
     k = int(args['-k'])
     complexity = int(args['--complexity'][0])
     nbits = int(args['--nbits'][0])
     window_size = int(args['--window_size'][0])
     window_size = min(len(seq), window_size)
-    max_bp_span = int(args['-b'])
+    max_bp_span = int(args['--max_bp_span'][0])
     max_bp_span = min(len(seq), max_bp_span)
     avg_bp_prob_cutoff = float(args['-p'])
     hard_threshold = float(args['-r'])
