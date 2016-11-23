@@ -175,7 +175,7 @@ def draw(seq,
             'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
             'invert_colormap': True, 'secondary_vertex_label': 'snip',
             'vertex_color': 'stability', 'colormap': 'Blues',
-            'ignore_for_layout': 'nesting'}
+            'ignore_for_layout': 'nesting', 'layout': 'KK'}
     draw_graph(graph, file_name=file_name, **opts)
 
 
