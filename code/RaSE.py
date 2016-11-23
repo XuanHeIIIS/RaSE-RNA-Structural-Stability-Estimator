@@ -13,7 +13,8 @@ Usage:
        [-k N] [-c N, --complexity=N] [-n N, --nbits=N] [-w N, --window_size=N]
        [-b N, --max_bp_span=N] [-p N, --avg_bp_prob_cutoff=N]
        [-r N, --hard_threshold=N] [-e N, --max_num_edges=N]
-       [-l, --no_lonely_bps] [-t, --no_nesting] [--draw]
+       [-l, --no_lonely_bps] [-t, --no_nesting]
+       [--draw] [--jpg | --svg | --png | --pdf]
        [--verbose]
   RaSE (-h | --help | --version)
 
@@ -32,7 +33,10 @@ Options:
   -l, --no_lonely_bps               Flag to activate no lonely base pairs mode.
   -t, --no_nesting                  Flag to activate no nesting mode.
   --draw                            Output drawing with standard name out.pdf.
-  --format
+  --jpg                             Save images in jpg format.
+  --svg                             Save images in svg format.
+  --png                             Save images in png format.
+  --pdf                             Save images in pdf format.
   -h --help                         Show this screen.
   --version                         Show version.
   --verbose                         Print more text.
@@ -48,6 +52,7 @@ from eden.converter.rna.rnaplfold import rnaplfold_to_eden
 from eden.converter.rna.rnafold import RNAfold_wrapper
 from eden.graph import Vectorizer
 from eden.util.display import draw_graph
+from eden.util.display import draw_graph_set
 import matplotlib.pyplot as plt
 from eden.util import configure_logging, serialize_dict
 import numpy as np
@@ -194,7 +199,7 @@ def serialize(seq, snips, scores, k=5):
     header = '             %s' % dotbracket(seq)
     yield header
     for i, (snip, score, nt, struct) in enumerate(tuples):
-        if score <= score_th:
+        if score < score_th:
             mark = '*'
         else:
             mark = ''
@@ -333,6 +338,28 @@ class StructuralStabilityEstimator(object):
                         pad_inches=0)
             plt.close()
 
+    def draw_all(self, file_name=None):
+        """Plot all k most unstable structures."""
+        infos = zip(self.snips, self.scores, self.seq)
+        tuples = sorted(
+            [(score, i, nt, snip)
+             for i, (snip, score, nt) in enumerate(infos)])
+        tuples = tuples[:self.k]
+        graphs = []
+        for score, position, nt, snip in tuples:
+            header = '%s %d %s' % (nt, position, snip)
+            alt_seq = _replace(self.seq, position, snip)
+            _graphs = self.fold([(header, alt_seq)])
+            graph = _graphs.next()
+            graphs.append(graph)
+
+        opts = {'size': 10, 'vertex_border': False, 'vertex_size': 200,
+                'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
+                'vertex_color': '_label_', 'colormap': 'Set3',
+                'ignore_for_layout': 'nesting',  # 'layout': 'KK',
+                'n_graphs_per_line': 2}
+        draw_graph_set(graphs, file_name=file_name, **opts)
+
 
 def main(args):
     """Main."""
@@ -352,6 +379,12 @@ def main(args):
     max_num_edges = int(args['--max_num_edges'][0])
     no_lonely_bps = args['--no_lonely_bps']
     no_nesting = args['--no_nesting']
+    draw = args['--draw']
+    jpg = args['--jpg']
+    svg = args['--svg']
+    png = args['--png']
+    pdf = args['--pdf']
+
     if no_nesting is True:
         nesting = False
     else:
@@ -383,9 +416,22 @@ def main(args):
         print(line)
 
     # if drawing is required use the folding algorithm to compute the graph
-    if args['--draw']:
-        rase.draw(file_name='structure.pdf')
-        rase.plot(file_name='score.pdf')
+    if draw:
+        suffix = 'pdf'
+        if jpg:
+            suffix = 'jpg'
+        if svg:
+            suffix = 'svg'
+        if png:
+            suffix = 'png'
+        if pdf:
+            suffix = 'pdf'
+        structure_fname = 'structure.' + suffix
+        score_fname = 'score.' + suffix
+        all_plots_fname = 'top_structures.' + suffix
+        rase.draw(file_name=structure_fname)
+        rase.plot(file_name=score_fname)
+        rase.draw_all(file_name=all_plots_fname)
 
 
 if __name__ == '__main__':
