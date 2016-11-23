@@ -10,7 +10,7 @@ RaSE exposes several functions that can be used inside other projects. See examp
 ## Usage
 
 ```
-echo 'AACAGUCGAUCGAUCGAC' | ./code/RaSE.py --draw | tee out.txt && open out.pdf
+echo 'GCGGAAGUAGUUCAGUGGUAGAACACCACCUUGCCAAGGUGGGGGUCGCGGGUUCGAAUCCCGUCUUCCGCU' | ./code/RaSE.py --draw | tee out.txt && open out.pdf
   0 A C 0.90
   1 A G 0.86
   2 C A 0.79
