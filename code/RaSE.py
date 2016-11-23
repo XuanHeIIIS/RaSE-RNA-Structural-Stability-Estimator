@@ -428,7 +428,7 @@ def main(args):
             suffix = 'pdf'
         structure_fname = 'structure.' + suffix
         score_fname = 'score.' + suffix
-        all_plots_fname = 'top_structures.' + suffix
+        all_plots_fname = 'structures.' + suffix
         rase.draw(file_name=structure_fname)
         rase.plot(file_name=score_fname)
         rase.draw_all(file_name=all_plots_fname)
