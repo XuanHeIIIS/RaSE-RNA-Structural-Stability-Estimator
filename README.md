@@ -3,6 +3,10 @@ RaSE - RNA structurAl Stability Estimator
 
 <p align="center"><img src="img/trna.png"></p>
 
+## Library
+RaSE exposes several functions that can be used inside otehr projects. See examples of use in the 
+ [Jupyter notebook](https://github.com/fabriziocosta/RaSE/blob/master/RNAStructuralStabilityEstimator.ipynb)
+
 ## Usage
 
 ```
