@@ -5,7 +5,7 @@
 
 Compute stability.
 
-Version: 1.0
+Version: 1.1
 Author: Fabrizio Costa [costa@informatik.uni-freiburg.de]
 
 Usage:
@@ -73,9 +73,9 @@ def _replace(seq, position, character):
     return ''.join(tokens)
 
 
-def compute_mfes(seq, snips):
-    """Given a sequence and the snip sequence yield all mfes."""
-    for position, character in enumerate(snips):
+def compute_mfes(seq, alternatives):
+    """Given a sequence and the alternative sequence yield all mfes."""
+    for position, character in enumerate(alternatives):
         alt_seq = _replace(seq, position, character)
         yield dotbracket(alt_seq)
 
@@ -140,11 +140,11 @@ def _make_string(gen):
 
 def _make_variations(seq, index=0, alphabet='ACGU'):
     for nt in alphabet:
-        snip = list(seq)
-        if snip[index] != nt:
-            snip[index] = nt
-            snip = _make_string(snip)
-            yield nt, snip
+        alternative = list(seq)
+        if alternative[index] != nt:
+            alternative[index] = nt
+            alternative = _make_string(alternative)
+            yield nt, alternative
 
 
 def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
@@ -166,10 +166,10 @@ def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
         sims = sims.reshape((len(alphabet) - 1, 1))
         sims_variations = zip(sims, _cmake_variations(seq))
 
-        score, snip = min([(sim[0], variation[0])
-                           for sim, variation in sims_variations])
+        score, alternative = min([(sim[0], variation[0])
+                                  for sim, variation in sims_variations])
 
-        yield score, snip
+        yield score, alternative
 
 
 def stability(seq, alphabet='ACGU', fold_vectorize=None):
@@ -179,31 +179,37 @@ def stability(seq, alphabet='ACGU', fold_vectorize=None):
     by replacing each nucleotide with all possible alternatives.
     This function wraps compute_stability and post processes its output.
     """
-    scores, snips = unzip(
+    scores, alternatives = unzip(
         compute_stability(seq,
                           alphabet=alphabet,
                           fold_vectorize=fold_vectorize))
     scores = list(scores)
-    snips = _make_string(snips)
-    return snips, scores
+    alternatives = _make_string(alternatives)
+    return alternatives, scores
 
 
-def serialize(seq, snips, scores, k=5):
-    """Pretty print of the snip information and the realtive scores."""
+def serialize(seq, alternatives, scores, k=5):
+    """Pretty print of the alternative information and the relative scores."""
+    alt_tuples = zip(alternatives, scores, seq)
     tuples = sorted(
-        [(score, i, nt, snip)
-         for i, (snip, score, nt) in enumerate(zip(snips, scores, seq))])
+        [(score, i, nt, alternative)
+         for i, (alternative, score, nt) in enumerate(alt_tuples)])
     score_th = tuples[k][0]
-    mfes = compute_mfes(seq, snips)
-    tuples = zip(snips, scores, seq, mfes)
+    mfes = compute_mfes(seq, alternatives)
+    tuples = zip(alternatives, scores, seq, mfes)
     header = '             %s' % dotbracket(seq)
     yield header
-    for i, (snip, score, nt, struct) in enumerate(tuples):
+    for i, (alternative, score, nt, struct) in enumerate(tuples):
         if score < score_th:
             mark = '*'
         else:
             mark = ''
-        yield '%3d %s %s %.2f %s %s' % (i, nt, snip, score, struct, mark)
+        yield '%3d %s %s %.2f %s %s' % (i,
+                                        nt,
+                                        alternative,
+                                        score,
+                                        struct,
+                                        mark)
 
 
 class StructuralStabilityEstimator(object):
@@ -248,7 +254,7 @@ class StructuralStabilityEstimator(object):
             then they are not of nesting type.
         """
         self.k = k
-        self.snips = None
+        self.alternatives = None
         self.scores = None
         self.seq = None
         self.fold = make_fold(window_size=window_size,
@@ -268,29 +274,35 @@ class StructuralStabilityEstimator(object):
         This function pretty prints the computed results.
         """
         self.seq = seq
-        snips, scores = stability(seq,
-                                  alphabet='ACGU',
-                                  fold_vectorize=self.fold_vectorize)
-        self.snips = snips
+        alternatives, scores = stability(seq,
+                                         alphabet='ACGU',
+                                         fold_vectorize=self.fold_vectorize)
+        self.alternatives = alternatives
         self.scores = scores
-        return serialize(seq, snips, scores, k=self.k)
+        return serialize(seq, alternatives, scores, k=self.k)
 
-    def _update_graph(self, graph, scores, snips):
+    def _update_graph(self, graph, scores, alternatives):
         for u in graph.nodes():
             pos = graph.node[u]['position']
             graph.node[u]['stability'] = scores[pos]
-            graph.node[u]['snip'] = snips[pos]
+            graph.node[u]['alternative'] = alternatives[pos]
         return graph
 
-    def _draw(self, seq, file_name=None, snips=None, scores=None, fold=None):
+    def _draw(self,
+              seq,
+              file_name=None,
+              alternatives=None,
+              scores=None,
+              fold=None):
         seqs = [('', seq)]
         graphs = fold(seqs)
         graph = graphs.next()
-        graph = self._update_graph(graph, scores, snips)
+        graph = self._update_graph(graph, scores, alternatives)
 
         opts = {'size': 14, 'vertex_border': False, 'vertex_size': 400,
                 'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
-                'invert_colormap': True, 'secondary_vertex_label': 'snip',
+                'invert_colormap': True,
+                'secondary_vertex_label': 'alternative',
                 'vertex_color': 'stability', 'colormap': 'Blues',
                 'ignore_for_layout': 'nesting', 'layout': 'KK'}
         draw_graph(graph, file_name=file_name, **opts)
@@ -302,7 +314,7 @@ class StructuralStabilityEstimator(object):
         """
         self._draw(self.seq,
                    file_name=file_name,
-                   snips=self.snips,
+                   alternatives=self.alternatives,
                    scores=self.scores,
                    fold=self.fold)
 
@@ -325,7 +337,7 @@ class StructuralStabilityEstimator(object):
         ax3.yaxis.set_visible(False)
         ax3.set_xlim(-1, len(self.seq))
         ax3.set_xticks(range(len(self.seq)))
-        ax3.set_xticklabels(list(self.snips))
+        ax3.set_xticklabels(list(self.alternatives))
         pos = ax3.get_position()
         pos = [pos.x0, pos.y0, pos.width, 0.001]
         ax3.set_position(pos)
@@ -340,15 +352,15 @@ class StructuralStabilityEstimator(object):
 
     def draw_all(self, file_name=None):
         """Plot all k most unstable structures."""
-        infos = zip(self.snips, self.scores, self.seq)
+        infos = zip(self.alternatives, self.scores, self.seq)
         tuples = sorted(
-            [(score, i, nt, snip)
-             for i, (snip, score, nt) in enumerate(infos)])
+            [(score, i, nt, alternative)
+             for i, (alternative, score, nt) in enumerate(infos)])
         tuples = tuples[:self.k]
         graphs = []
-        for score, position, nt, snip in tuples:
-            header = '%s %d %s' % (nt, position, snip)
-            alt_seq = _replace(self.seq, position, snip)
+        for score, position, nt, alternative in tuples:
+            header = '%s %d %s' % (nt, position, alternative)
+            alt_seq = _replace(self.seq, position, alternative)
             _graphs = self.fold([(header, alt_seq)])
             graph = _graphs.next()
             graphs.append(graph)
@@ -435,5 +447,5 @@ def main(args):
 
 
 if __name__ == '__main__':
-    args = docopt(__doc__, version='RaSE v1.0')
+    args = docopt(__doc__, version='RaSE v1.1')
     main(args)
