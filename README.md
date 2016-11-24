@@ -25,7 +25,7 @@ The plot image depicts the nt position on the top x axis, the original nt on the
 
 <p align="center"><img src="img/plot.png"></p>
 
-The structures image depicts the graph encoding of the individual k mutations that most changes the computed structure. 
+The structures image depicts the graph encoding of the individual k mutations that most changes the computed structure. The title associated with each graph is composed of the original nt, the position and the mutation that most changes the computed structure.
 
 <p align="center"><img src="img/structures.png"></p>
 
