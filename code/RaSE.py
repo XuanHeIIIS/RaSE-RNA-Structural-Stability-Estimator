@@ -44,6 +44,7 @@ Options:
 
 """
 import sys
+import os
 from docopt import docopt
 from toolz import curry, compose
 from toolz.sandbox.core import unzip
@@ -55,10 +56,43 @@ from eden.util.display import draw_graph
 from eden.util.display import draw_graph_set
 import matplotlib.pyplot as plt
 from eden.util import configure_logging, serialize_dict
+from eden.converter.fasta import fasta_to_sequence
 import numpy as np
+import requests
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _save(text, full_out_file_name):
+    with open(full_out_file_name, 'w') as f:
+        for line in text:
+            f.write("%s\n" % line.encode('utf8').strip())
+
+
+def _rfam_uri(rfam_id):
+    # retrieve the seed sequences from RFAM and save them to file
+    rfam = 'http://rfam.xfam.org/family/'
+    body = '%s/alignment?acc=%s' % (rfam_id, rfam_id)
+    fmt = '&format=fastau&download=0'
+    uri = rfam + body + fmt
+    rfam_dir = 'RNA'
+    fname = rfam_id + '.fa'
+    if not os.path.exists(rfam_dir):
+        os.mkdir(rfam_dir)
+    full_out_file_name = os.path.join(rfam_dir, fname)
+    if not os.path.isfile(full_out_file_name):
+        text = requests.get(uri).text.split('\n')
+        _save(text, full_out_file_name)
+    return full_out_file_name
+
+
+def get_rfam_sequence(rfam_id, seq_id):
+    """Connect to RFAM database and retrieve a single sequence."""
+    data = _rfam_uri(rfam_id)
+    seqs = list(fasta_to_sequence(data))
+    header, seq = seqs[seq_id]
+    return header, seq
 
 
 def dotbracket(seq):
@@ -179,10 +213,10 @@ def stability(seq, alphabet='ACGU', fold_vectorize=None):
     by replacing each nucleotide with all possible alternatives.
     This function wraps compute_stability and post processes its output.
     """
-    scores, alternatives = unzip(
-        compute_stability(seq,
-                          alphabet=alphabet,
-                          fold_vectorize=fold_vectorize))
+    scores, alternatives = unzip(compute_stability(
+        seq,
+        alphabet=alphabet,
+        fold_vectorize=fold_vectorize))
     scores = list(scores)
     alternatives = _make_string(alternatives)
     return alternatives, scores
@@ -216,6 +250,7 @@ class StructuralStabilityEstimator(object):
     """Class for the computation of the structural effects of nt change."""
 
     def __init__(self,
+                 seq=None,
                  alphabet='ACGU',
                  k=5,
                  complexity=3,
@@ -253,10 +288,12 @@ class StructuralStabilityEstimator(object):
             If the edges with avg probability is greater than hard_threshold
             then they are not of nesting type.
         """
+        self.seq = seq
         self.k = k
         self.alternatives = None
         self.scores = None
-        self.seq = None
+        window_size = max(window_size, len(seq))
+        max_bp_span = max(max_bp_span, len(seq))
         self.fold = make_fold(window_size=window_size,
                               max_bp_span=max_bp_span,
                               avg_bp_prob_cutoff=avg_bp_prob_cutoff,
@@ -268,18 +305,19 @@ class StructuralStabilityEstimator(object):
                                                   nbits=nbits,
                                                   fold=self.fold)
 
-    def transform(self, seq):
+    def transform(self):
         """Wrapper for the computation of the structural effects of nt change.
 
         This function pretty prints the computed results.
         """
-        self.seq = seq
-        alternatives, scores = stability(seq,
-                                         alphabet='ACGU',
-                                         fold_vectorize=self.fold_vectorize)
-        self.alternatives = alternatives
-        self.scores = scores
-        return serialize(seq, alternatives, scores, k=self.k)
+        self.alternatives, self.scores = stability(
+            self.seq,
+            alphabet='ACGU',
+            fold_vectorize=self.fold_vectorize)
+        return serialize(self.seq,
+                         self.alternatives,
+                         self.scores,
+                         k=self.k)
 
     def _update_graph(self, graph, scores, alternatives):
         for u in graph.nodes():
@@ -330,6 +368,7 @@ class StructuralStabilityEstimator(object):
         ax1.set_xticks(range(len(self.seq)))
         ax1.set_xticklabels(list(self.seq))
         ax1.set_xlim(-1, len(self.seq))
+        ax1.set_ylim(0, 1)
         ax2 = ax1.twiny()
         ax2.set_xlim(-1, len(self.seq))
         ax2.set_xticks(range(len(self.seq)))
@@ -423,7 +462,7 @@ def main(args):
                                         max_num_edges=max_num_edges,
                                         no_lonely_bps=no_lonely_bps,
                                         nesting=nesting)
-    # print: nt pos, original nt, most de-stabilizing nt, similarity score
+    # print: nt pos, original nt, most de-stabilizing nt, dotbracket, score
     for line in rase.transform(seq):
         print(line)
 
