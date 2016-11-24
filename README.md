@@ -129,7 +129,7 @@ RaSE - RNA structurAl Stability Estimate.
 
 Compute stability.
 
-Version: 1.0
+Version: 1.1
 Author: Fabrizio Costa [costa@informatik.uni-freiburg.de]
 
 Usage:
