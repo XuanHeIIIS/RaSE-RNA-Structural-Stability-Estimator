@@ -1,7 +1,8 @@
 [![DOI](https://zenodo.org/badge/74471783.svg)](https://zenodo.org/badge/latestdoi/74471783)
 
-# RaSE
-RaSE - RNA structurAl Stability Estimator
+# RaSE - RNA structurAl Stability Estimator
+RaSE is a python program that uses the graph vectorization technique of [EDeN](https://github.com/fabriziocosta/EDeN) to compute a score indicative of the structural stability responsibility of each nucleotide in an RNA sequence. The score is computed as the similarity of the structure obtained by changing a single nucleotide with respect to the original structure. Out of the 3 possible alternatives, only the one which yields the largest difference is reported. The problem of assessing the similarity between two structures is cast in the equivalent problem of assessing the similarity between two graphs which encode the structural information. Structures are computed using the [RNAplfold](https://www.tbi.univie.ac.at/RNA/RNAplfold.1.html) program. The graph embedding represents nucleotides as nodes labeled with the one letter code (A|C|G|U); relations between backbone bounds and base pairs with a probability higher than --hard_threshold are repersented as conjunctive edges, relations between base pairs with probability in the interval --avg_bp_prob_cutoff and --hard_threshold are represented as disjunctive edges. Graphs are transformed into a high dimensional saprse vector representation using the graph vectorization technique of [EDeN](https://github.com/fabriziocosta/EDeN). The similarity between the corresponding vectors is then computed as the [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
+
 
 ## Input
 RaSe takes in input a RNA sequence as a single string of one letter code (A|C|G|U). The string can be provided via the stdin or via the -i flag.
