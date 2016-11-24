@@ -87,7 +87,7 @@ def _rfam_uri(rfam_id):
     return full_out_file_name
 
 
-def get_rfam_sequence(rfam_id, seq_id):
+def get_rfam_sequence(rfam_id=None, seq_id=0):
     """Connect to RFAM database and retrieve a single sequence."""
     data = _rfam_uri(rfam_id)
     seqs = list(fasta_to_sequence(data))
@@ -107,9 +107,9 @@ def _replace(seq, position, character):
     return ''.join(tokens)
 
 
-def compute_mfes(seq, alternatives):
+def compute_mfes(seq, mutations):
     """Given a sequence and the alternative sequence yield all mfes."""
-    for position, character in enumerate(alternatives):
+    for position, character in enumerate(mutations):
         alt_seq = _replace(seq, position, character)
         yield dotbracket(alt_seq)
 
@@ -185,7 +185,7 @@ def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
     """Compute the structural effects of single nt change.
 
     Specifically, compute the least similarity of the structure obtained
-    by replacing each nucleotide with all possible alternatives.
+    by replacing each nucleotide with all possible mutations.
     """
     # TODO: parallelize indices
     for index in range(len(seq)):
@@ -210,27 +210,27 @@ def stability(seq, alphabet='ACGU', fold_vectorize=None):
     """Compute the structural effects of single nt change.
 
     Specifically, compute the least similarity of the structure obtained
-    by replacing each nucleotide with all possible alternatives.
+    by replacing each nucleotide with all possible mutations.
     This function wraps compute_stability and post processes its output.
     """
-    scores, alternatives = unzip(compute_stability(
+    scores, mutations = unzip(compute_stability(
         seq,
         alphabet=alphabet,
         fold_vectorize=fold_vectorize))
     scores = list(scores)
-    alternatives = _make_string(alternatives)
-    return alternatives, scores
+    mutations = _make_string(mutations)
+    return mutations, scores
 
 
-def serialize(seq, alternatives, scores, k=5):
+def serialize(seq, mutations, scores, k=5):
     """Pretty print of the alternative information and the relative scores."""
-    alt_tuples = zip(alternatives, scores, seq)
+    alt_tuples = zip(mutations, scores, seq)
     tuples = sorted(
         [(score, i, nt, alternative)
          for i, (alternative, score, nt) in enumerate(alt_tuples)])
     score_th = tuples[k][0]
-    mfes = compute_mfes(seq, alternatives)
-    tuples = zip(alternatives, scores, seq, mfes)
+    mfes = compute_mfes(seq, mutations)
+    tuples = zip(mutations, scores, seq, mfes)
     header = '             %s' % dotbracket(seq)
     yield header
     for i, (alternative, score, nt, struct) in enumerate(tuples):
@@ -250,7 +250,7 @@ class StructuralStabilityEstimator(object):
     """Class for the computation of the structural effects of nt change."""
 
     def __init__(self,
-                 seq=None,
+                 seq,
                  alphabet='ACGU',
                  k=5,
                  complexity=3,
@@ -290,7 +290,7 @@ class StructuralStabilityEstimator(object):
         """
         self.seq = seq
         self.k = k
-        self.alternatives = None
+        self.mutations = None
         self.scores = None
         window_size = max(window_size, len(seq))
         max_bp_span = max(max_bp_span, len(seq))
@@ -305,44 +305,46 @@ class StructuralStabilityEstimator(object):
                                                   nbits=nbits,
                                                   fold=self.fold)
 
-    def transform(self):
+    def transform(self, ids=None):
         """Wrapper for the computation of the structural effects of nt change.
 
         This function pretty prints the computed results.
         """
-        self.alternatives, self.scores = stability(
+        self.mutations, self.scores = stability(
             self.seq,
             alphabet='ACGU',
             fold_vectorize=self.fold_vectorize)
         return serialize(self.seq,
-                         self.alternatives,
+                         self.mutations,
                          self.scores,
                          k=self.k)
 
-    def _update_graph(self, graph, scores, alternatives):
+    def _update_graph(self, graph, scores, mutations):
         for u in graph.nodes():
             pos = graph.node[u]['position']
             graph.node[u]['stability'] = scores[pos]
-            graph.node[u]['alternative'] = alternatives[pos]
+            graph.node[u]['alternative'] = mutations[pos]
         return graph
 
     def _draw(self,
               seq,
               file_name=None,
-              alternatives=None,
+              mutations=None,
               scores=None,
               fold=None):
         seqs = [('', seq)]
         graphs = fold(seqs)
         graph = graphs.next()
-        graph = self._update_graph(graph, scores, alternatives)
+        graph = self._update_graph(graph, scores, mutations)
 
-        opts = {'size': 14, 'vertex_border': False, 'vertex_size': 400,
-                'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
-                'invert_colormap': True,
+        opts = {'size': 14, 'font_size': 9, 'layout': 'KK',
+                'vertex_border': False, 'vertex_size': 400,
+                'vertex_alpha': 0.5, 'invert_colormap': True,
                 'secondary_vertex_label': 'alternative',
-                'vertex_color': 'stability', 'colormap': 'Blues',
-                'ignore_for_layout': 'nesting', 'layout': 'KK'}
+                'vertex_color': 'stability', 'colormap': 'OrRd',
+                'edge_label': None, 'edge_alpha': 0.2,
+                'dark_edge_alpha': 0.8,
+                'ignore_for_layout': 'nesting'}
         draw_graph(graph, file_name=file_name, **opts)
 
     def draw(self, file_name=None):
@@ -352,7 +354,7 @@ class StructuralStabilityEstimator(object):
         """
         self._draw(self.seq,
                    file_name=file_name,
-                   alternatives=self.alternatives,
+                   mutations=self.mutations,
                    scores=self.scores,
                    fold=self.fold)
 
@@ -376,7 +378,7 @@ class StructuralStabilityEstimator(object):
         ax3.yaxis.set_visible(False)
         ax3.set_xlim(-1, len(self.seq))
         ax3.set_xticks(range(len(self.seq)))
-        ax3.set_xticklabels(list(self.alternatives))
+        ax3.set_xticklabels(list(self.mutations))
         pos = ax3.get_position()
         pos = [pos.x0, pos.y0, pos.width, 0.001]
         ax3.set_position(pos)
@@ -391,7 +393,7 @@ class StructuralStabilityEstimator(object):
 
     def draw_all(self, file_name=None):
         """Plot all k most unstable structures."""
-        infos = zip(self.alternatives, self.scores, self.seq)
+        infos = zip(self.mutations, self.scores, self.seq)
         tuples = sorted(
             [(score, i, nt, alternative)
              for i, (alternative, score, nt) in enumerate(infos)])
@@ -404,11 +406,13 @@ class StructuralStabilityEstimator(object):
             graph = _graphs.next()
             graphs.append(graph)
 
-        opts = {'size': 10, 'vertex_border': False, 'vertex_size': 200,
-                'edge_label': None, 'font_size': 9, 'vertex_alpha': 0.6,
-                'vertex_color': '_label_', 'colormap': 'Set3',
-                'ignore_for_layout': 'nesting',  # 'layout': 'KK',
-                'n_graphs_per_line': 2}
+        opts = {'size': 10, 'font_size': 9, 'colormap': 'rainbow',
+                'vertex_border': False, 'vertex_size': 200,
+                'vertex_alpha': 0.4, 'vertex_color': '_label_',
+                'edge_alpha': 0.2, 'edge_label': None,
+                'dark_edge_alpha': 0.8,
+                'ignore_for_layout': 'nesting', 'layout': 'KK',
+                'n_graphs_per_line': 3}
         draw_graph_set(graphs, file_name=file_name, **opts)
 
 
