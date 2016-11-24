@@ -5,7 +5,7 @@ RaSE is a python program that uses the graph vectorization technique of [EDeN](h
 
 
 ## Input
-RaSe takes in input a RNA sequence as a single string of one letter code (A|C|G|U). The string can be provided via the stdin or via the -i flag.
+RaSe takes in input a RNA sequence as a single string of one letter code (A|C|G|U). The string can be provided via stdin or via the -i flag.
 
 
 ## Output
