@@ -4,7 +4,7 @@
 RaSE - RNA structurAl Stability Estimator
 
 ## Input
-RaSe takes in input
+RaSe takes in input a RNA sequence as a single string of one letter code (A|C|G|U). The string can be provided via the stdin or via the -i flag.
 
 
 ## Output
@@ -15,19 +15,28 @@ RaSe outputs to stdout a space separated tabular file with the following format:
   0 G C 0.63 ((((.((((((.((.......)).)))))).)))).......((((((...))))))(((((.......)))))........ 
   1 C G 0.23 (((((((.((((((((.........((((((.......))))))..))))))))...(((((.......)))))))))))). *
 ```
+RaSE can optionally produce image files in various formats (jpg, png, svg, pdf). When invoked with the flag --draw the following files are produced: structure.[format], plot.[format], structures.[format] 
+
+The structure image depicts the graph encoding of the most probable RNA structure: edges between backbone bounds and base pairs with a probability higher than --hard_threshold are displayed with a solid line, edges between base pairs with probability in the interval --avg_bp_prob_cutoff and --hard_threshold are displayed with a dashed line. The node label is composed of the original nt (above) and the mutation that most changes the computed structure (below). The color intensity is proportional to 1 - similarity, so that darker nodes are the ones that have the largest effect on the structure.
 
 <p align="center"><img src="img/trna.png"></p>
+
+The plot image depicts the nt position on the top x axis, the original nt on the bottom x axis, the mutation that most changes the computed structure on the bottom x axis but inside the plot, the score = 1 - similarity on the y axis, so that the highest bar corresponds to the mutation that has the largest effect on the structure.
+
 <p align="center"><img src="img/plot.png"></p>
+
+The structures image depicts the graph encoding of the individual k mutations that most changes the computed structure. 
+
 <p align="center"><img src="img/structures.png"></p>
 
 ## Library
 RaSE exposes several functions that can be used inside other projects. See examples of use in the 
  [Jupyter notebook](https://github.com/fabriziocosta/RaSE/blob/master/RNAStructuralStabilityEstimator.ipynb)
 
-## Usage
+## Example
 
 ```
-echo 'GUGGACGUGCCGGAGUGGUUAUCGGGCAUGACUAGAAAUCAUGUGGGCUUUGCCCGCGCAGGUUCGAAUCCUGCCGUUCACG' | ./code/RaSE.py --draw
+echo 'GUGGACGUGCCGGAGUGGUUAUCGGGCAUGACUAGAAAUCAUGUGGGCUUUGCCCGCGCAGGUUCGAAUCCUGCCGUUCACG' | ./RaSE.py
              (((((((((((.((.......)).))))..............((((((...))))))(((((.......)))))))))))).
   0 G C 0.63 ((((.((((((.((.......)).)))))).)))).......((((((...))))))(((((.......)))))........ 
   1 U C 0.61 ((((.((((((.((.......)).))))))...........(((((((...)))))))((((.......))))))))..... 
