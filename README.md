@@ -9,7 +9,7 @@ RaSe takes in input a RNA sequence as a single string of one letter code (A|C|G|
 
 
 ## Output
-RaSe outputs to stdout a space separated tabular file with the following format: the first line contains the Minimum Free Energy structure (MFE) in dotbracket notation; the following lines contain the nucleotide (nt) position, the nt one letter code (A|C|G|U), the nt code for the mutation that most changes the computed structure, the similarity score between the original structure and the structure obtained by the mutation, the MFE of the mutated sequence and an optional character * marking the top dissimilar cases.  
+RaSe outputs to stdout a space separated tabular file with the following format: the first line contains the Minimum Free Energy structure (MFE) in dotbracket notation; the following lines contain the nucleotide (nt) position, the nt one letter code (A|C|G|U), the nt code for the mutation that most changes the computed structure, the similarity score between the original structure and the structure obtained by the mutation, the MFE of the mutated sequence and an optional character (*) marking the top dissimilar cases.  
 
 ```
              (((((((((((.((.......)).))))..............((((((...))))))(((((.......)))))))))))).
