@@ -5,6 +5,8 @@ RaSE is a python program that uses the graph vectorization technique of [EDeN](h
 
 
 ## Install
+You can use the [conda](http://conda.pydata.org/miniconda.html) package manager to install RaSE.
+
 ```
 conda install -c bioconda rase 
 ```
