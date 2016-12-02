@@ -455,7 +455,8 @@ def main(args):
     logger.debug(serialize_dict(args))
 
     # setup folding algorithm
-    rase = StructuralStabilityEstimator(alphabet='ACGU',
+    rase = StructuralStabilityEstimator(seq,
+                                        alphabet='ACGU',
                                         k=k,
                                         complexity=complexity,
                                         nbits=nbits,
