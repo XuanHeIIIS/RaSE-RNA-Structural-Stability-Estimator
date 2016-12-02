@@ -1,7 +1,7 @@
 [![DOI](https://zenodo.org/badge/74471783.svg)](https://zenodo.org/badge/latestdoi/74471783)
 
 # RaSE - RNA structurAl Stability Estimator
-RaSE is a python (2.7) program that uses the graph vectorization technique of [EDeN](https://github.com/fabriziocosta/EDeN) to compute a score indicative of the structural stability responsibility of each nucleotide in an RNA sequence. The score is computed as the similarity of the structure obtained by changing a single nucleotide with respect to the original structure. Out of the 3 possible alternatives, only the one which yields the largest difference is reported. The problem of assessing the similarity between two structures is cast in the equivalent problem of assessing the similarity between two graphs which encode the structural information. Structures are computed using the [RNAplfold](https://www.tbi.univie.ac.at/RNA/RNAplfold.1.html) program. The graph embedding represents nucleotides as nodes labeled with the one letter code (A|C|G|U); relations between backbone bounds and base pairs with a probability higher than --hard_threshold are repersented as conjunctive edges, relations between base pairs with probability in the interval --avg_bp_prob_cutoff and --hard_threshold are represented as disjunctive edges. Graphs are transformed into a high dimensional saprse vector representation using the graph vectorization technique of [EDeN](https://github.com/fabriziocosta/EDeN). The similarity between the corresponding vectors is then computed as the [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
+RaSE is a python (2.7) program that uses the graph vectorization technique of [EDeN](https://github.com/fabriziocosta/EDeN) to compute a score indicative of the structural stability responsibility of each nucleotide in an RNA sequence. The score is computed as the similarity of the structure obtained by changing a single nucleotide with respect to the original structure. Out of the 3 possible alternatives, only the one which yields the largest difference is reported. The problem of assessing the similarity between two structures is cast in the equivalent problem of assessing the similarity between two graphs that encode the structural information. Structure information is assessed using the [RNAplfold](https://www.tbi.univie.ac.at/RNA/RNAplfold.1.html) program, which provides probability information for all possible base pairs between nucleotides. The graph embedding represents nucleotides as nodes labeled with the one letter code (`A|C|G|U`); relations representing backbone bonds and base pairs with a probability higher than `--hard_threshold` are repersented as conjunctive edges, relations between base pairs with probability in the interval `--avg_bp_prob_cutoff` and `--hard_threshold` are represented as disjunctive edges. Graphs are transformed into a high dimensional sparse vector representation using the graph vectorization technique of [EDeN](https://github.com/fabriziocosta/EDeN). The similarity between the corresponding vectors is then computed as the [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
 
 
 ## Install
@@ -13,28 +13,28 @@ conda install -c bioconda rase
 
 
 ## Input
-RaSe takes in input a RNA sequence as a single string of one letter code (A|C|G|U). The string can be provided via stdin or via the -i flag.
+RaSe takes in input a RNA sequence as a single string of one letter code (`A|C|G|U`). The string can be provided via stdin or via the `-i` flag.
 
 
 ## Output
-RaSe outputs to stdout a space separated tabular file with the following format: the first line contains the Minimum Free Energy structure (MFE) in dotbracket notation of the original sequence; the following lines contain the nucleotide (nt) position, the nt one letter code (A|C|G|U), the nt code for the mutation that most changes the computed structure, the similarity score between the original structure and the structure obtained by the mutation, the MFE structure of the mutated sequence in dotbracket notation and an optional character * marking the top dissimilar cases.  
+RaSe outputs to stdout a space separated tabular file with the following format: the first line contains the Minimum Free Energy structure (MFE) in dotbracket notation of the original sequence; the following lines contain the nucleotide (nt) position, the nt one letter code (`A|C|G|U`), the nt code for the mutation that most changes the computed structure, the similarity score between the original structure and the structure obtained by the mutation, the MFE structure of the mutated sequence in dotbracket notation and an optional character `*` marking the top dissimilar cases.  
 
 ```
              (((((((((((.((.......)).))))..............((((((...))))))(((((.......)))))))))))).
   0 G C 0.63 ((((.((((((.((.......)).)))))).)))).......((((((...))))))(((((.......)))))........ 
   1 C G 0.23 (((((((.((((((((.........((((((.......))))))..))))))))...(((((.......)))))))))))). *
 ```
-RaSE can optionally produce image files in various formats (jpg, png, svg, pdf). When invoked with the flag --draw the following files are produced: structure.[format], plot.[format], structures.[format] 
+RaSE can optionally produce image files in various formats (jpg, png, svg, pdf). When invoked with the flag `--draw` the following files are produced: `structure.[format]`, `plot.[format]`, `structures.[format]` 
 
-The structure image depicts the graph encoding of the most probable RNA structure: edges between backbone bounds and base pairs with a probability higher than --hard_threshold are displayed with a solid line, edges between base pairs with probability in the interval --avg_bp_prob_cutoff and --hard_threshold are displayed with a dashed line. The node label is composed of the original nt (above) and the mutation that most changes the computed structure (below). The color intensity is proportional to 1 - similarity, so that darker nodes are the ones that have the largest effect on the structure.
+The `structure` image depicts the graph encoding of the most probable RNA structure: edges representing the backbone or base pairs with a probability higher than `--hard_threshold` are displayed with a solid line, edges between base pairs with probability in the interval `--avg_bp_prob_cutoff` and `--hard_threshold` are displayed with a dashed line. The node label is composed of the original nt (above) and the mutation that most changes the computed structure (below). The color intensity is proportional to 1 - similarity, so that darker nodes are the ones that have the largest effect on the structure.
 
 <p align="center"><img src="img/structure.png"></p>
 
-The plot image depicts the nt position on the top x axis, the original nt on the bottom x axis, the mutation that most changes the computed structure on the bottom x axis but inside the plot, the score = 1 - similarity on the y axis, so that the highest bar corresponds to the mutation that has the largest effect on the structure.
+The `plot` image depicts the nt position on the top x axis, the original nt on the bottom x axis, the mutation that most changes the computed structure on the bottom x axis but inside the plot, the score = 1 - similarity on the y axis, so that the highest bar corresponds to the mutation that has the largest effect on the structure.
 
 <p align="center"><img src="img/plot.png"></p>
 
-The structures image depicts the graph encoding of the individual k mutations that most changes the computed structure. The title associated with each graph is composed of the original nt, the position and the mutation that most changes the computed structure.
+The `structures` image depicts the graph encoding of the individual k mutations that most changes the computed structure. The title associated with each graph is composed of the original nt, the position and the mutation that most changes the computed structure. The node color encode the different nts (`A|C|G|U`). The line encoding is the same as for the `structure` plot (see above).
 
 <p align="center"><img src="img/structures.png"></p>
 
