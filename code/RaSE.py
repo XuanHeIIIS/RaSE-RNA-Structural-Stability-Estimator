@@ -231,8 +231,11 @@ def serialize(seq, mutations, scores, k=5):
     score_th = tuples[k][0]
     mfes = compute_mfes(seq, mutations)
     tuples = zip(mutations, scores, seq, mfes)
-    header = '             %s' % dotbracket(seq)
-    yield header
+    spacer = '             '
+    seq_str = spacer + '%s' % seq
+    yield seq_str
+    struct_str = spacer + '%s' % dotbracket(seq)
+    yield struct_str
     for i, (alternative, score, nt, struct) in enumerate(tuples):
         if score < score_th:
             mark = '*'
