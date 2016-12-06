@@ -45,6 +45,10 @@ Options:
 """
 import sys
 import os
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 from docopt import docopt
 from toolz import curry, compose
 from toolz.sandbox.core import unzip
@@ -54,7 +58,7 @@ from eden.converter.rna.rnafold import RNAfold_wrapper
 from eden.graph import Vectorizer
 from eden.util.display import draw_graph
 from eden.util.display import draw_graph_set
-import matplotlib.pyplot as plt
+
 from eden.util import configure_logging, serialize_dict
 from eden.converter.fasta import fasta_to_sequence
 import numpy as np
