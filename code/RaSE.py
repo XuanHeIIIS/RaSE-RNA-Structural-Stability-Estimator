@@ -184,6 +184,12 @@ def _make_variations(seq, index=0, alphabet='ACGU'):
             alternative = _make_string(alternative)
             yield nt, alternative
 
+def _make_variation(seq, index=0, mut_char=None):
+
+    alternative = list(seq)
+    alternative[index] = mut_char
+    alternative = _make_string(alternative)
+    return mut_char, alternative
 
 def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
     """Compute the structural effects of single nt change.
@@ -208,6 +214,22 @@ def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
                                   for sim, variation in sims_variations])
 
         yield score, alternative
+
+
+def compute_SNP_stability(seq, snp_tag=None, fold_vectorize=None):
+    """Compute the structural effects of single nt change for a given SNP.
+
+    Specifically, compute the similarity of the structure obtained
+    by mutating the given SNP_tag (wild_nuc, index, mut_nuc).
+  
+    """
+    wild_c, mut_index, mut_c  = snp_tag
+    mut_seq = _make_variation(seq, mut_index, mut_c)
+    vec = fold_vectorize([('', seq)])
+    mut_vec = fold_vectorize([mut_seq])
+    sim = vec.dot(mut_vec.T)
+
+    return sim[0,0]
 
 
 def stability(seq, alphabet='ACGU', fold_vectorize=None):
