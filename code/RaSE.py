@@ -45,6 +45,7 @@ Options:
 """
 import sys
 import numpy as np
+from scipy.stats import rankdata
 import math
 from docopt import docopt
 from toolz import curry, compose
@@ -232,29 +233,26 @@ def stability_score(seq, pos=None, mutation=None, fold_vectorize=None):
 def serialize(seq, mutations, scores, k=5):
     """Pretty print of the alternative information and the relative scores."""
     num_digits = int(math.log10(len(seq))) + 1
-    alt_tuples = zip(mutations, scores, seq)
-    tuples = sorted(
-        [(score, i, nt, alternative)
-         for i, (alternative, score, nt) in enumerate(alt_tuples)])
-    score_th = tuples[k][0]
+    ranks = rankdata(scores, method='min')
     mfes = compute_mfes(seq, mutations)
-    tuples = zip(mutations, scores, seq, mfes)
-    spacer = '            '
+    tuples = zip(scores, ranks, seq, range(len(seq)), mutations, mfes)
+    score_th = sorted(tuples)[k][0]
+    spacer = '               '
     seq_str = spacer + '%s' % seq
     yield seq_str
     struct_str = spacer + '%s' % dotbracket(seq)
     yield struct_str
-    for i, (alternative, score, nt, struct) in enumerate(tuples):
+    for score, rank, nt, i, mutation, struct in tuples:
         if score < score_th:
             mark = '*'
         else:
             mark = ''
         if num_digits < 3:
-            line = '%s %02d %s ' % (nt, i, alternative)
+            line = '%02d %s %02d %s ' % (rank, nt, i, mutation)
         elif num_digits == 3:
-            line = '%s %03d %s ' % (nt, i, alternative)
+            line = '%03d %s %03d %s ' % (rank, nt, i, mutation)
         else:
-            line = '%s %d %s ' % (nt, i, alternative)
+            line = '%d %s %d %s ' % (rank, nt, i, mutation)
         yield line + '%.2f %s %s' % (score, struct, mark)
 
 
