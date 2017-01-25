@@ -44,21 +44,21 @@ Options:
 
 """
 import sys
-import os
+import numpy as np
+import math
 from docopt import docopt
 from toolz import curry, compose
-from toolz.sandbox.core import unzip
-from sklearn.metrics.pairwise import pairwise_kernels
-from eden.converter.rna.rnaplfold import rnaplfold_to_eden
-from eden.converter.rna.rnafold import RNAfold_wrapper
-from eden.graph import Vectorizer
-from eden.util.display import draw_graph
-from eden.util.display import draw_graph_set
+from toolz.curried import map
 import matplotlib.pyplot as plt
+
+from sklearn.metrics.pairwise import pairwise_kernels
+
+from eden.graph import Vectorizer
+from eden.display import draw_graph
+from eden.display import draw_graph_set
+from eden_rna.rnaplfold import fold as fold_rnaplfold
+from eden_rna.rnafold import rnafold_wrapper as fold_rnafold
 from eden.util import configure_logging, serialize_dict
-from eden.converter.fasta import fasta_to_sequence
-import numpy as np
-import requests
 
 import logging
 logger = logging.getLogger(__name__)
@@ -70,34 +70,9 @@ def _save(text, full_out_file_name):
             f.write("%s\n" % line.encode('utf8').strip())
 
 
-def _rfam_uri(rfam_id):
-    # retrieve the seed sequences from RFAM and save them to file
-    rfam = 'http://rfam.xfam.org/family/'
-    body = '%s/alignment?acc=%s' % (rfam_id, rfam_id)
-    fmt = '&format=fastau&download=0'
-    uri = rfam + body + fmt
-    rfam_dir = 'RNA'
-    fname = rfam_id + '.fa'
-    if not os.path.exists(rfam_dir):
-        os.mkdir(rfam_dir)
-    full_out_file_name = os.path.join(rfam_dir, fname)
-    if not os.path.isfile(full_out_file_name):
-        text = requests.get(uri).text.split('\n')
-        _save(text, full_out_file_name)
-    return full_out_file_name
-
-
-def get_rfam_sequence(rfam_id=None, seq_id=0):
-    """Connect to RFAM database and retrieve a single sequence."""
-    data = _rfam_uri(rfam_id)
-    seqs = list(fasta_to_sequence(data))
-    header, seq = seqs[seq_id]
-    return header, seq
-
-
 def dotbracket(seq):
     """Compute the MFE in dotbracket notation."""
-    seq_info, seq_struct = RNAfold_wrapper(seq)
+    seq_info, seq_struct = fold_rnafold(seq)
     return seq_struct
 
 
@@ -147,24 +122,41 @@ def make_fold(window_size=150,
         If the edges with avg probability is greater than hard_threshold
         then they are not of nesting type.
     """
-    fold = curry(rnaplfold_to_eden)(window_size=window_size,
-                                    max_bp_span=max_bp_span,
-                                    avg_bp_prob_cutoff=avg_bp_prob_cutoff,
-                                    hard_threshold=hard_threshold,
-                                    max_num_edges=max_num_edges,
-                                    no_lonely_bps=no_lonely_bps,
-                                    nesting=nesting)
+    fold = curry(fold_rnaplfold)(window_size=window_size,
+                                 max_bp_span=max_bp_span,
+                                 avg_bp_prob_cutoff=avg_bp_prob_cutoff,
+                                 hard_threshold=hard_threshold,
+                                 max_num_edges=max_num_edges,
+                                 no_lonely_bps=no_lonely_bps,
+                                 nesting=nesting)
     return fold
+
+
+def _window_reweight(boundaries, original_graph):
+    graph = original_graph.copy()
+    if boundaries is not None:
+        begin, end = boundaries
+        for i, u in enumerate(graph.nodes()):
+            if begin <= i <= end:
+                w = 1
+            else:
+                w = 0
+            graph.node[u]['weight'] = w
+    else:
+        pass
+    return graph
 
 
 def make_fold_vectorize(complexity=3,
                         nbits=15,
-                        fold=None):
+                        fold=None,
+                        boundaries=None):
     """Curry parameters in vectorizer."""
     vec = Vectorizer(complexity=complexity, nbits=nbits)
     vectorize = curry(lambda vec, graphs: vec.transform(graphs))(vec)
 
-    fold_vectorize = compose(vectorize, fold)
+    cwindow_reweight = curry(_window_reweight)(boundaries)
+    fold_vectorize = compose(vectorize, map(cwindow_reweight), fold)
     return fold_vectorize
 
 
@@ -172,13 +164,16 @@ def _make_string(gen):
     return ''.join(list(gen))
 
 
+def _make_variation(seq, index, mutation):
+    alternative = list(seq)
+    alternative[index] = mutation
+    return _make_string(alternative)
+
+
 def _make_variations(seq, index=0, alphabet='ACGU'):
     for nt in alphabet:
-        alternative = list(seq)
-        if alternative[index] != nt:
-            alternative[index] = nt
-            alternative = _make_string(alternative)
-            yield nt, alternative
+        alternative = _make_variation(seq, index, nt)
+        yield (nt, alternative)
 
 
 def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
@@ -188,22 +183,25 @@ def compute_stability(seq, alphabet='ACGU', fold_vectorize=None):
     by replacing each nucleotide with all possible mutations.
     """
     # TODO: parallelize indices
+    matrix = np.zeros((len(alphabet), len(seq)))
+    scores = list()
+    mutations = list()
+    vec = fold_vectorize([('header_placeholder', seq)])
     for index in range(len(seq)):
         _cmake_variations = curry(_make_variations)(index=index,
                                                     alphabet=alphabet)
         make_vecs = compose(fold_vectorize, _cmake_variations)
         variation_vecs = make_vecs(seq)
-
-        vec = fold_vectorize([('', seq)])
-
         sims = pairwise_kernels(vec, variation_vecs, metric='cosine')
-        sims = sims.reshape((len(alphabet) - 1, 1))
+        sims = sims.reshape((len(alphabet), 1))
         sims_variations = zip(sims, _cmake_variations(seq))
-
         score, alternative = min([(sim[0], variation[0])
                                   for sim, variation in sims_variations])
-
-        yield score, alternative
+        scores.append(score)
+        mutations.append(alternative)
+        for i in range(4):
+            matrix[i, index] = sims[i]
+    return scores, mutations, matrix
 
 
 def stability(seq, alphabet='ACGU', fold_vectorize=None):
@@ -213,17 +211,27 @@ def stability(seq, alphabet='ACGU', fold_vectorize=None):
     by replacing each nucleotide with all possible mutations.
     This function wraps compute_stability and post processes its output.
     """
-    scores, mutations = unzip(compute_stability(
-        seq,
-        alphabet=alphabet,
-        fold_vectorize=fold_vectorize))
-    scores = list(scores)
+    scores, mutations, matrix = compute_stability(
+        seq, alphabet, fold_vectorize)
     mutations = _make_string(mutations)
-    return mutations, scores
+    return mutations, scores, matrix
+
+
+def stability_score(seq, pos=None, mutation=None, fold_vectorize=None):
+    """stability."""
+    vec1 = fold_vectorize([('header_placeholder', seq)])
+    alternative = _make_variation(seq, pos, mutation)
+    vec2 = fold_vectorize([('header_placeholder', alternative)])
+    norm1 = vec1.dot(vec1.T)
+    norm2 = vec2.dot(vec2.T)
+    score = vec1.dot(vec2.T) / np.sqrt(norm1 * norm2)
+    score = score[0, 0]
+    return score
 
 
 def serialize(seq, mutations, scores, k=5):
     """Pretty print of the alternative information and the relative scores."""
+    num_digits = int(math.log10(len(seq))) + 1
     alt_tuples = zip(mutations, scores, seq)
     tuples = sorted(
         [(score, i, nt, alternative)
@@ -231,7 +239,7 @@ def serialize(seq, mutations, scores, k=5):
     score_th = tuples[k][0]
     mfes = compute_mfes(seq, mutations)
     tuples = zip(mutations, scores, seq, mfes)
-    spacer = '             '
+    spacer = '            '
     seq_str = spacer + '%s' % seq
     yield seq_str
     struct_str = spacer + '%s' % dotbracket(seq)
@@ -241,12 +249,13 @@ def serialize(seq, mutations, scores, k=5):
             mark = '*'
         else:
             mark = ''
-        yield '%3d %s %s %.2f %s %s' % (i,
-                                        nt,
-                                        alternative,
-                                        score,
-                                        struct,
-                                        mark)
+        if num_digits < 3:
+            line = '%s %02d %s ' % (nt, i, alternative)
+        elif num_digits == 3:
+            line = '%s %03d %s ' % (nt, i, alternative)
+        else:
+            line = '%s %d %s ' % (nt, i, alternative)
+        yield line + '%.2f %s %s' % (score, struct, mark)
 
 
 class StructuralStabilityEstimator(object):
@@ -254,6 +263,8 @@ class StructuralStabilityEstimator(object):
 
     def __init__(self,
                  seq,
+                 importance_window_begin=None,
+                 importance_window_end=None,
                  alphabet='ACGU',
                  k=5,
                  complexity=3,
@@ -292,9 +303,14 @@ class StructuralStabilityEstimator(object):
             then they are not of nesting type.
         """
         self.seq = seq
+        self.importance_window_begin = importance_window_begin
+        self.importance_window_end = importance_window_end
         self.k = k
+        self.complexity = complexity
+        self.nbits = nbits
         self.mutations = None
         self.scores = None
+        self.matrix = None
         window_size = max(window_size, len(seq))
         max_bp_span = max(max_bp_span, len(seq))
         self.fold = make_fold(window_size=window_size,
@@ -304,19 +320,51 @@ class StructuralStabilityEstimator(object):
                               max_num_edges=max_num_edges,
                               no_lonely_bps=no_lonely_bps,
                               nesting=nesting)
-        self.fold_vectorize = make_fold_vectorize(complexity=complexity,
-                                                  nbits=nbits,
-                                                  fold=self.fold)
+        if self.importance_window_begin is not None \
+                and self.importance_window_end is not None:
+            begin = max(0, self.importance_window_begin)
+            end = min(len(self.seq), self.importance_window_end)
+            boundaries = (begin, end)
+        else:
+            boundaries = None
+        self.fold_vectorize = make_fold_vectorize(complexity=self.complexity,
+                                                  nbits=self.nbits,
+                                                  fold=self.fold,
+                                                  boundaries=boundaries)
 
-    def transform(self, ids=None):
-        """Wrapper for the computation of the structural effects of nt change.
+    def stability_score(self, pos=None, mutation=None,
+                        importance_semi_window=None):
+        """stability."""
+        if importance_semi_window is not None:
+            begin = max(0, pos - importance_semi_window)
+            end = min(len(self.seq), pos + importance_semi_window)
+            boundaries = (begin, end)
+        else:
+            if self.importance_window_begin is not None \
+                    and self.importance_window_end is not None:
+                begin = max(0, self.importance_window_begin)
+                end = min(len(self.seq), self.importance_window_end)
+                boundaries = (begin, end)
+            else:
+                boundaries = None
+        self.fold_vectorize = make_fold_vectorize(complexity=self.complexity,
+                                                  nbits=self.nbits,
+                                                  fold=self.fold,
+                                                  boundaries=boundaries)
+        return stability_score(self.seq,
+                               pos=pos,
+                               mutation=mutation,
+                               fold_vectorize=self.fold_vectorize)
 
-        This function pretty prints the computed results.
-        """
-        self.mutations, self.scores = stability(
+    def compute_stability_scores(self):
+        """Computation of the structural effects of nt change."""
+        self.mutations, self.scores, self.matrix = stability(
             self.seq,
             alphabet='ACGU',
             fold_vectorize=self.fold_vectorize)
+
+    def output(self):
+        """Pretty print the computed results."""
         return serialize(self.seq,
                          self.mutations,
                          self.scores,
@@ -335,7 +383,7 @@ class StructuralStabilityEstimator(object):
               mutations=None,
               scores=None,
               fold=None):
-        seqs = [('', seq)]
+        seqs = [('header_placeholder', seq)]
         graphs = fold(seqs)
         graph = graphs.next()
         graph = self._update_graph(graph, scores, mutations)
@@ -361,7 +409,7 @@ class StructuralStabilityEstimator(object):
                    scores=self.scores,
                    fold=self.fold)
 
-    def plot(self, file_name=None):
+    def plot_instability(self, file_name=None):
         """Graph of unstability in the RNA sequence."""
         size = len(self.scores) / 2.5
         fig = plt.figure(figsize=(size, 2.5))
@@ -385,6 +433,24 @@ class StructuralStabilityEstimator(object):
         pos = ax3.get_position()
         pos = [pos.x0, pos.y0, pos.width, 0.001]
         ax3.set_position(pos)
+        if file_name is None:
+            plt.show()
+        else:
+            plt.savefig(file_name,
+                        bbox_inches='tight',
+                        transparent=True,
+                        pad_inches=0)
+            plt.close()
+
+    def plot_stability_matrix(self, file_name=None):
+        """Plot matrix of unstability in the RNA sequence."""
+        size = len(self.seq) / 2.5
+        plt.figure(figsize=(size, 2.5))
+        plt.imshow(self.matrix,
+                   interpolation='none',
+                   cmap=plt.get_cmap('YlOrRd'))
+        plt.yticks(range(4), ['A', 'C', 'G', 'U'], fontsize=12)
+        plt.xticks(range(len(self.seq)), fontsize=12)
         if file_name is None:
             plt.show()
         else:
